@@ -1,6 +1,9 @@
 import pandas as pd
 import os.path
 import hashlib
+from logbook import Logger
+
+LOG = Logger("utils")
 
 
 def archive(df, name, path, types=["feather"]):
