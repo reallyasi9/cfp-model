@@ -3,7 +3,6 @@
 import os.path
 import sys
 import pandas as pd
-import hashlib
 from logbook import Logger, FileHandler, StderrHandler
 import click
 from utils import archive
