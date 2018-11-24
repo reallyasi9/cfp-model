@@ -62,6 +62,10 @@ def train_model(infile=None, outdir="."):
     LOG.debug(
         f"Number of team-games after dropping incomplete games: {df.shape[0]}")
 
+    # Drop games before 1958 (modern football only)
+    df = df.loc[(df["Year"] >= 1958)]
+    LOG.debug(f"Number of team-games after dropping pre-modern seasons: {df.shape[0]}")
+
     # Convert team to categorical
     df["Team"] = df["Team"].astype("category")
     n_teams = len(df["Team"].cat.categories)
@@ -76,9 +80,15 @@ def train_model(infile=None, outdir="."):
     grouped_df = df.groupby(["Team", "Year"], sort=False)
     LOG.debug(f"Number of team-season batches after drops: {len(grouped_df)}")
 
+    LOG.debug(f"Longest season: {grouped_df.size().max()}")
+
     # Convert to a list of arrays for NN input
     teams, opponents, weeks, years, homes, wins, margins = zip(*[(g["Team"].cat.codes, g["Opponent"].cat.codes, g["Week"], g["Year"],
                                                                   g["Home"], g["Win"], g["Points"] - g["OPoints"]) for _, g in grouped_df])
+
+    print(type(teams[0]))
+    print(type(teams))
+    exit()
 
     # With these, we can begin.
     teams_train, teams_test, opponents_train, opponents_test, \
