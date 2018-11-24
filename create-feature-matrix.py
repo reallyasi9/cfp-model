@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
 import os.path
-import sys
 import pandas as pd
 from logbook import Logger, FileHandler, StderrHandler
 import click
 from utils import archive
 
-
-DEBUG_HANDLER = FileHandler("create-feature-matrix.log", level="DEBUG", bubble=True)
+DEBUG_HANDLER = FileHandler(
+    "create-feature-matrix.log", level="DEBUG", bubble=True)
 DEFAULT_HANDLER = StderrHandler(level="INFO")
 LOG = Logger("create-feature-matrix")
 
