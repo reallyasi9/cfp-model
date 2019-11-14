@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import os.path
+import numpy as np
 import pandas as pd
 from logbook import Logger, FileHandler, StderrHandler
 import click
 from utils import archive
 
-DEBUG_HANDLER = FileHandler(
-    "create-feature-matrix.log", level="DEBUG", bubble=True)
+DEBUG_HANDLER = FileHandler("create-feature-matrix.log", level="DEBUG", bubble=True)
 DEFAULT_HANDLER = StderrHandler(level="INFO")
 LOG = Logger("create-feature-matrix")
 
@@ -56,6 +56,58 @@ def create_feature_matrix(infile=None, outdir="."):
     )
     out_df["Home"] = 1
     out_df["Win"] = (out_df["Points"] > out_df["OPoints"]) * 1
+    out_df["DOY"] = out_df["DateTime"].map(lambda x: x.timetuple().tm_yday)
+
+    # Create a lagged number of wins (2 seasons' worth sounds good, right?)
+    # plus an exponentially-weighted number of wins (older wins are not as
+    # predictive, right?)
+    out_df.sort_values(by=["Team", "DateTime"], ascending=True, inplace=True)
+    roll_win_pct = (
+        out_df.groupby("Team").rolling(window="365d", on="DateTime")["Win"].mean()
+    )
+
+    def exp_win(s, halflife=np.timedelta64(365, "D")):
+        m = np.max(s.index.values)
+        x = m - s.index.values
+        w = np.exp(-x / (2 * halflife))
+        a = np.average(s.values, weights=w)
+        return a
+
+    exp_win_pct = (
+        out_df.groupby("Team")
+        .rolling(window="365d", on="DateTime")["Win"]
+        .apply(exp_win, raw=False)
+    )
+
+    def lin_win(s, halflife=np.timedelta64(365, "D")):
+        m = np.max(s.index.values)
+        w = 1.0 - (m - s.index.values) / (2 * halflife)
+        a = np.average(s.values, weights=w)
+        return a
+
+    lin_win_pct = (
+        out_df.groupby("Team")
+        .rolling(window="365d", on="DateTime")["Win"]
+        .apply(lin_win, raw=False)
+    )
+
+    # Join back onto the output by team/datetime,
+    # once for the home team and once for the opponent
+    out_df = out_df.merge(
+        roll_win_pct.to_frame("RollWinPct"),
+        how="left",
+        left_on=["Team", "DateTime"],
+        right_index=True,
+    )
+    print(roll_win_pct.to_frame("ORollWinPct").rename_axis(["Opponent", "DateTime"]))
+    out_df = out_df.merge(
+        roll_win_pct.to_frame("ORollWinPct").rename_axis(["Opponent", "DateTime"]),
+        how="left",
+        left_on=["Opponent", "DateTime"],
+        right_index=True,
+    )
+    print(out_df)
+    exit()
 
     # Join an identical version onto the output but with the teams swapped
     swapped_df = out_df.copy()
