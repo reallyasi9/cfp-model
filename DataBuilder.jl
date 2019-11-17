@@ -1,15 +1,17 @@
 
+if length(ARGS) != 1
+    @error "must specify one year to download"
+    exit(-1)
+end
+
 import Pkg
 Pkg.activate(".")
 
 import HTTP
 import JSON
-using URIParser: URI
-using BufferedStreams: BufferedInputStream
 using DataFrames
 using DataFramesMeta
 using CSVFiles
-using FeatherFiles
 
 # Get plays
 function getplays(year::Int, week::Int)
@@ -89,7 +91,6 @@ function getplays(year::Int, week::Int)
         playTypes[n] = play["play_type"]
         # Position gains are strange on kicks--the play starts at the original line of scrimmage, and the offense is the kicking team.
         # This means, e.g., a kickoff return for a touchdown looks like the defense ran 100/35 lengths of the field.  Not ideal.
-    #     distanceGains[i] = play["yards_gained"]/play["distance"]
     #     positionGains[i] = play["yards_gained"]/play["yard_line"]
     end
 
@@ -188,13 +189,12 @@ function positiondeltas(playsDf::DataFrame)
             end
         end
         deltaPosition = vcat(df.position[2:n], endPos) - df.position
-        deltaDistance = deltaPosition ./ df.distance .* 10  # how much of the distance to go did you get?  Position is 1/field, distance is 1/chains.
-        (play_id = df.play_id, delta_position = deltaPosition, delta_distance = deltaDistance)
+        (play_id = df.play_id, delta_position = deltaPosition)
     end
     return deltaPositions
 end
 
-for year in 2014:2018
+let year = parse(Int, ARGS[1])
     for week in 1:14
         playsDf = getplays(year, week)
         gamesDf = getgames(year, week)
@@ -216,6 +216,10 @@ for year in 2014:2018
 
         deltaPositions = positiondeltas(playsDf)
         playsDf = join(playsDf, deltaPositions, on=[:play_id, :drive_id], kind=:left)
+
+	dropmissing!(playsDf, disallowmissing=true)
+	show(playsDf, allcols=true)
+	println()
 
         outname = "plays_$(year)_$(week).csv"
         playsDf |> save(outname)
