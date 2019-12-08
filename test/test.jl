@@ -49,3 +49,8 @@ for col in [:offense, :defense, :home, :away]
     levels!(testdata[!, col], teams)
 end
 categorical!(testdata, [:down, :period, :play_type])
+
+# figure out the longest game in number of plays for padding
+nplays = maximum(nrow, groupby(traindata, :game_id))
+
+# convert dataframe into an nvar x nplays x ngames (sparse) matrix
