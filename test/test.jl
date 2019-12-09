@@ -3,6 +3,7 @@ pkg"activate ."
 
 include("../CFPModel.jl")
 import .CFPModel
+using SparseArrays
 using DataFrames, DataFramesMeta
 using FeatherFiles
 using Flux
@@ -54,3 +55,45 @@ categorical!(testdata, [:down, :period, :play_type])
 nplays = maximum(nrow, groupby(traindata, :game_id))
 
 # convert dataframe into an nvar x nplays x ngames (sparse) matrix
+function expandfeatures(game)
+    offense = Flux.onehotbatch(game.offense, teams, "unknown")
+    defense = Flux.onehotbatch(game.defense, teams, "unknown")
+    down = Flux.onehotbatch(game.down, collect(1:4))
+    period = Flux.onehotbatch(game.period, collect(1:4))
+
+    nfeatures = size(offense, 1) + size(defense, 1) + size(down, 1) + size(period, 1) + 3
+    nextra = nplays - size(offense, 2)
+
+    extra = spzeros(Float32, nfeatures, nextra)
+
+    sparse(hcat(vcat(offense, defense, down, period, game.fraction_to_gain', game.clock', game.game_clock'), extra))
+end
+
+# make a model
+nteams = length(teams)
+teamembedding = Flux.Dense(nteams, 10, Flux.relu(1.))
+model = Chain(
+    x -> vcat(teamembedding(x[1:nteams]), teamembedding(x[nteams+1:2nteams]), x[2nteams+1:end]),
+    Flux.LSTM(31, 32),
+    Flux.Dropout(.2),
+    Flux.LSTM(32, 32),
+    Flux.Dropout(.2),
+    Dense(32, 32, Flux.relu(1.)),
+    Dense(32, 32, Flux.relu(1.)),
+    Dense(32, 1, Flux.tanh)
+)
+ps = Flux.params(model)
+opt = Flux.ADAM
+loss(x, y) = Flux.mse(model(x), y)
+
+# callback to keep track of progress
+callback() = begin
+    total_loss = mapreduce(x -> loss(expandfeatures(x), x.position_change), +, groupby(testdata, :game_id))
+    println("Average test loss: $(total_loss / nrow(testdata))")
+end
+
+for game in groupby(traindata, :game_id)
+    Flux.train!(loss, ps, [(expandfeatures(game), game.position_change)], opt, Flux.throttle(callback, 1))
+end
+
+X = map(expandfeatures, groupby(traindata, :game_id))
