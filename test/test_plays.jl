@@ -1,8 +1,8 @@
 using Pkg
 pkg"activate ."
 
-include("../CFPModel.jl")
-import .CFPModel
+include("../CFBModel.jl")
+import .CFBModel
 using SparseArrays
 using DataFrames, DataFramesMeta
 using FeatherFiles
