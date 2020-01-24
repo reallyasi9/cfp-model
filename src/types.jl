@@ -1,3 +1,5 @@
+using Dates
+
 struct Clock
     minutes::Union{Int8,Nothing}
     seconds::Union{Int8,Nothing}
@@ -64,4 +66,27 @@ struct Drive
     plays::Int8
     yards::Int  # Needs some serious cleaning in certain games
     drive_result::String
+end
+
+struct Game
+    id::Int64
+    season::Int16
+    week::Int8
+    season_type::String
+    start_date::String
+    neutral_site::Bool
+    conference_game::Bool
+    attendance::Int32
+    venue_id::Int16
+    venue::String
+    home_team::String
+    home_conference::Union{String,Nothing}
+    home_points::Int8
+    home_line_scores::Vector{Int8}
+    home_post_win_prob::String
+    away_team::String
+    away_conference::Union{String,Nothing}
+    away_points::Int8
+    away_line_scores::Vector{Int8}
+    away_post_win_prob::String
 end
